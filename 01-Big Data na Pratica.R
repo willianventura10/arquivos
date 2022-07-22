@@ -1,83 +1,80 @@
-# Big Data na Prática - Buscando Dados para Análise Financeira
+# Big Data na Prática - Mapeando Áreas de Crimes
 
-# http://www.quantmod.com
+install.packages("ggmap")
+install.packages("ggplot2")
+install.packages("downloader")
+library(ggmap)
+library(ggplot2)
+library(downloader)
 
-# Instalar e carregar os pacotes
-install.packages("quantmod")
-install.packages("xts")
-install.packages("moments")
-library(quantmod)
-library(xts)
-library(moments)
+# Download e unzip do arquivo
+url <- "http://datascienceacademy.com.br/blog/aluno/RFundamentos/Datasets/Parte3/crimes.zip"
+arquivo <- "crimes.zip"
+download(url, arquivo)
+unzip("crimes.zip")
 
-# Seleção do período de análise
-startDate = as.Date("2022-01-21")
-endDate = as.Date("2022-05-21")
+# Criando o dataframe
+df <- read.csv("crimes.txt")
+head(df)
+str(df)
+dim(df)
 
-# Download dos dados do período
-?getSymbols
-getSymbols("PETR4.SA", src = "yahoo", from = startDate, to = endDate)
+# Criando o plot
+mapa <- qmap("seattle", zoom = 11, source = "stamen", 
+             maptype = "toner", darken = c(.3,"#BBBBBB"))
+mapa
 
-# Checando o tipo de dado retornado
-class(PETR4.SA)
-is.xts(PETR4.SA)
+# Mapeando os dados 
+mapa + geom_point(data = df, aes(x = Longitude, y = Latitude))
 
-# Mostra os primeiros registros para as ações da Petrobras
-head(PETR4.SA)
+# Mapeando os dados e ajustando a escala
+mapa + geom_point(data = df, aes(x = Longitude, y = Latitude), 
+                  color = "dark green", alpha = .03, size = 1.1)
 
-# Analisando os dados de fechamento 
-PETR4.SA.Close <- PETR4.SA[, "PETR4.SA.Close"]
-is.xts(PETR4.SA.Close)
-?Cl
-head(Cl(PETR4.SA),5)
+# Mapeando os dados e definindo uma camada de intensidade
+mapa +
+  stat_density2d(data = df, aes(x = Longitude, y = Latitude, 
+                                color = ..density.., 
+                                size = ifelse(..density..<= 1,0,..density..), 
+                                alpha = ..density..), geom = "tile",contour = F) +
+  scale_color_continuous(low = "orange", high = "red", guide = "none") +
+  scale_size_continuous(range = c(0, 3), guide = "none") +
+  scale_alpha(range = c(0,.5), guide = "none") +
+  ggtitle("Crimes em Seattle") +
+  theme(plot.title = element_text(family = "Trebuchet MS", size = 36, face = "bold", hjust = 0, color = "#777777")) 
 
-# Agora, vamos plotar o gráfico da Petrobras
-# Gráfico de candlestick da Petrobras
-?candleChart
-candleChart(PETR4.SA)
 
-# Plot do fechamento
-plot(PETR4.SA.Close, main = "Fechamento Diária Ações Petrobras",
-     col = "red", xlab = "Data", ylab = "Preço", major.ticks = 'months',
-     minor.ticks = FALSE)
 
-# Adicionado as bandas de bollinger ao gráfico, com média de 20 períodos e 2 desvios
-# Bollinger Band
-# Como o desvio padrão é uma medida de volatilidade, 
-# Bollinger Bands ajustam-se às condições de mercado. Mercados mais voláteis, 
-# possuem as bandas mais distantes da média, enquanto mercados menso voláteis possuem as
-# bancas mais próximas da média
-?addBBands
-addBBands(n = 20, sd = 2)
+# Big Data na Prática - Mapeando Áreas de Bikes
+library(ggmap)
+library(ggplot2)
+ 
+# Obtendo os dados
+url <- "http://datascienceacademy.com.br/blog/aluno/RFundamentos/Datasets/Parte3/paris.zip"
+arquivo <- "paris.zip"
+download(url, arquivo)
+unzip("paris.zip")
 
-# Adicionando o indicador ADX, média 11 do tipo exponencial
-?addADX
-addADX(n = 11, maType = "EMA")
+# Gerando o dataframe
+df2 <- read.csv("paris.txt", sep = ",", header = T) 
+str(df)
+dim(df)
 
-# Calculando logs diários
-?log
-PETR4.SA.ret <- diff(log(PETR4.SA.Close), lag = 1)
+# Criando o mapa
+map.paris <- qmap("paris", source="stamen", zoom=12, maptype="toner", darken=c(.3, "#BBBBBB")) 
 
-# Remove valores NA na prosição 1
-PETR4.SA.ret <- PETR4.SA.ret[-1] 
+# Unindo mapa e camada de dados
+map.paris +
+  geom_point(data = df2, aes(x = longitude, y = latitude, 
+                             size = available_bike_stands, 
+                             color = available_bike_stands), 
+                             alpha = .9, na.rm = T) +
+  scale_color_gradient(low = "#33CC33", high = "#003300", name = "Número de Bikes Disponíveis") +
+  scale_size(range=c(1,11) , guide="none") + 
+  ggtitle("Número de Bikes Disponíveis em Paris") +
+  theme(text = element_text(family = "Trebuchet MS", color = "#666666")) +
+  theme(plot.title = element_text( size = 32, face = "bold", hjust = 0, vjust = .5))
 
-# Plotar a taxa de retorno
-plot(PETR4.SA.ret, main = "Fechamento Diário das Ações da Petrobras",
-     col = "red", xlab = "Data", ylab = "Retorno", major.ticks = 'months',
-     minor.ticks = FALSE)
-
-# Calculando algumas medidas estatísticas
-statNames <- c("Mean", "Standard Deviation", "Skewness", "Kurtosis")
-PETR4.SA.stats <- c(mean(PETR4.SA.ret), sd(PETR4.SA.ret), skewness(PETR4.SA.ret), kurtosis(PETR4.SA.ret))
-names(PETR4.SA.stats) <- statNames
-PETR4.SA.stats
-
-# Salvando os dados em um arquivo .rds (arquivo em formato binário do R)
-getSymbols("PETR4.SA", src = 'yahoo')
-saveRDS(PETR4.SA, file = "PETR4.SA.rds") # Salva os dados em formato binário
-Ptr = readRDS("PETR4.SA.rds")
-dir()
-head(Ptr)
 
 
 
